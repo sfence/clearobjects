@@ -1,5 +1,4 @@
 
-
 local initial_properties = {
   hp_max = 1,
   breath_max = 0,
@@ -44,18 +43,17 @@ function clearobjects.register_get_staticdata_loader(func)
 end
 
 local function get_staticdata_loader(entity_name)
+  local def = minetest.registered_entities[entity_name]
+  if def then
+    if type(def.load_staticdata)=="function" then
+      return def.load_staticdata
+    end
+  end
   for _,func in pairs (clearobjects.registered_get_staticdata_loaders) do
     local callback = func(entity_name);
     if callback then
       return callback
     end
-  end
-  local def = minetest.registered_entities[entity_name]
-  if not def then
-    return nil
-  end
-  if typ(def.load_staticdata)=="function" then
-    return def.load_staticdata
   end
   return nil
 end
@@ -87,8 +85,10 @@ function clearobjects.create_virtual_entity(entity_name, staticdata)
   setmetatable(data.luae, {__index=minetest.registered_entities[entity_name] or {name = entity_name}})
   setmetatable(object, {__index=data})
 
-  def.load_staticdata(object, staticdata)
+  local luaentity = object:get_luaentity()
+  if not load_staticdata(luaentity, staticdata) then
+    return nil
+  end
 
-  return object
+  return luaentity
 end
-

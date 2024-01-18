@@ -10,18 +10,19 @@ clearobjects = { translator = S}
 
 dofile(modpath.."/shared.lua")
 dofile(modpath.."/rules.lua")
+dofile(modpath.."/loaders.lua")
 
 function clearobjects.on_clear_object_names(name, _, params)
-  if table.indexof(params, name) ~= -1 then
-    print("Entity "..name.." is selected to remove")
-    return true
+  if table.indexof(params.names, name) ~= -1 then
+    --print("Entity "..name.." is selected to remove")
+    return not params.negative
   end
-    print("Entity "..name.." should be keep.")
-  return false
+  --print("Entity "..name.." should be keep.")
+  return params.negative
 end
 
 minetest.override_chatcommand("clearobjects", {
-	params = S("[quick | full | hard-quick | hard-full] [(names <names_list>) | (rules <rules_table>)]"),
+	params = S("[quick | full | hard-quick | hard-full] [(names | not-names <names_list>) | (rules | not-rules <rules_table>)]"),
   func = function (name, param)
 		local options = {}
     local check = false;
@@ -29,13 +30,15 @@ minetest.override_chatcommand("clearobjects", {
       options.mode = "quick"
       options.callback = clearobjects.on_clear_object_rules
       options.params = {
-        e = {prevent_soft_clear = false}
+        negative = true,
+        e = {prevent_soft_clear = true}
       }
     elseif  param:match("^full%-soft[%s]*") then
       options.mode = "full"
       options.callback = clearobjects.on_clear_object_rules
       options.params = {
-        e = {prevent_soft_clear = false}
+        negative = true,
+        e = {prevent_soft_clear = true}
       }
     elseif  param:match("^quick[%s]*") then
 			options.mode = "quick"
@@ -52,17 +55,25 @@ minetest.override_chatcommand("clearobjects", {
     end
     if check then
       local begin = param:match("^[%a]+[%s]+names[%s]+")
-      if begin then
-			  options.params = string.split(param:sub(begin:len()+1,-1), "[%s]*,[%s]*", nil, nil, true)
-        print(dump(options.params))
+      local begin_not = param:match("^[%a]+[%s]+not-names[%s]+")
+      if begin or begin_not then
+			  options.params = {
+          negative = (begin_not ~= nil),
+          names = string.split(param:sub(begin:len()+1,-1), "[%s]*,[%s]*", nil, nil, true)
+        }
+        --print(dump(options.params))
         if options.params then
           options.callback = clearobjects.on_clear_object_names
         end
       end
       begin = param:match("^[%a]+[%s]+rules[%s]+")
-      if begin then
+      begin_not = param:match("^[%a]+[%s]+not-rules[%s]+")
+      if begin or begin_not then
 			  options.params = minetest.parse_json(param:sub(begin:len()+1,-1))
         if options.params then
+          options.params.negative = (begin_not ~= nil)
+          options.params.remove_unloaded = options.remove_unloaded or minetest.settings:get_bool("clearobjects_remove_unloaded", false)
+          --print(dump(options.params))
           options.callback = clearobjects.on_clear_object_rules
         end
       end
@@ -83,4 +94,3 @@ minetest.override_chatcommand("clearobjects", {
 		return true
 	end,
 })
-

@@ -1,0 +1,3 @@
+
+# default setting for remove_unloaded for clearobjects rules mode
+clearobjects_remove_unloaded (Remove unloaded objects by clearobjects rules mode) bool false

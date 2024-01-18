@@ -38,13 +38,28 @@ local S = clearobjects.translator
 }
 --]]
 
-local function check_rule(rule, value)
+local function check_rule(rule, value, door)
 	--print("Checking rule "..dump(rule).." and value "..dump(value))
 	if type(rule) == type(value) then
-		-- direct comparison, rule and value have equel type
-		if rule == value then
-			return true
-		end
+	  if type(rule) == "table" then
+      local remove = true
+      for key, new_rule in pairs(rule) do
+        if door then
+          remove = remove or check_rule(new_rule, value[key], door)
+        else
+          remove = remove and check_rule(new_rule, value[key], door)
+          if not remove then
+            return false
+          end
+        end
+      end
+      return remove
+    else
+		  -- direct comparison, rule and value have equel type
+		  if rule == value then
+			  return true
+		  end
+    end
 	elseif type(rule) == "table" then
 		-- rule table, check type of value
 		if rule.type == type(value) then
@@ -84,24 +99,37 @@ clearobjects.on_clear_object_rules = function(name, staticdata, rules)
                       or ((type(rules.p)=="table") and (not rawequal(next(rules.p), nil)))
   if remove_init then
     minetest.log("action", S("Clearing objects with rules: @1", dump(rules)))
-    for _, entity in pairs(minetest.luaentities) do
-      local remove = remove_init
-      -- rules for luaentity table
-      if type(rules.e) == "table" then
-        local values = entity.object:get_luaentity()
-        for key, rule in pairs(rules.e) do
-          remove = remove and check_rule(rule, values[key])
+    local remove = remove_init
+    if rules.door then
+      remove = false
+    end
+    -- rules for luaentity table
+    if type(rules.e) == "table" then
+      local values = virtual_entity
+      for key, rule in pairs(rules.e) do
+        if rules.door then
+          remove = remove or check_rule(rule, values[key], rules.door)
+        else
+          remove = remove and check_rule(rule, values[key], rules.door)
           if not remove then break end
         end
       end
-      -- rules for properties table
-      if type(rules.p) == "table" then
-        local values = entity.object:get_properties()
-        for key, rule in pairs(rules.p) do
-          remove = remove and check_rule(rule, values[key])
+    end
+    -- rules for properties table
+    if type(rules.p) == "table" then
+      local values = virtual_entity.object:get_properties()
+      for key, rule in pairs(rules.p) do
+        if rules.door then
+          remove = remove or check_rule(rule, values[key], rules.door)
+        else
+          remove = remove and check_rule(rule, values[key], rules,door)
           if not remove then break end
         end
       end
+    end
+    if rules.negative then
+      return not remove
+    else
       return remove
     end
   else
@@ -109,4 +137,3 @@ clearobjects.on_clear_object_rules = function(name, staticdata, rules)
   end
   return false
 end
-
